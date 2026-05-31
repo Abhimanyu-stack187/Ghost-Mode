@@ -1,0 +1,20 @@
+:root {
+  color-scheme: dark;
+  --bg-void: #05060b;
+  --bg-deep: #080b13;
+  --panel: rgba(13, 18, 31, 0.76);
+  --panel-raised: rgba(18, 24, 42, 0.9);
+  --border: rgba(133, 152, 255, 0.16);
+  --border-bright: rgba(53, 233, 255, 0.32);
+  --cyan: #35e9ff;
+  --purple: #9b5cff;
+  --blue: #4586ff;
+  --pink: #ff4d9d;
+  --amber: #ffb84d;
+  --text-primary: #f4f7ff;
+  --text-secondary: #a4aec4;
+  --text-muted: #657089;
+  --sidebar-width: 216px;
+  --header-height: 64px;
+  --radius-panel: 16px;
+}
