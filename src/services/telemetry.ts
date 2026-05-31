@@ -53,6 +53,28 @@ export interface ElectronTelemetryBridge {
   invoke(channel: string, payload?: unknown): Promise<unknown>;
 }
 
+export interface BackendTelemetryEvent {
+  type: "outbound_connection";
+  process: string;
+  ip: string;
+  port?: number | string;
+  protocol?: string;
+  timestamp: number;
+  activeConnections?: number;
+  risk?: "low" | "medium" | "high" | "critical";
+  severity?: "low" | "medium" | "high" | "critical";
+  riskScore?: number;
+  company?: string;
+  category?: string;
+}
+
+export interface TelemetryStreamHandlers {
+  onEvent: (event: BackendTelemetryEvent) => void;
+  onOpen?: () => void;
+  onClose?: () => void;
+  onError?: (error: Event) => void;
+}
+
 const trackerData: TrackerData = {
   trackerCount: mockTelemetry.trackerCount,
   newTrackerCount: mockTelemetry.newTrackerCount,
@@ -68,6 +90,8 @@ const trackerData: TrackerData = {
 };
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
+const DEFAULT_WS_URL = "ws://localhost:5050/telemetry";
 
 export function createMockTelemetryTransport(): TelemetryTransport {
   return {
@@ -129,4 +153,36 @@ export async function getHeatmapData() {
 
 export async function getLeakData(email?: string) {
   return telemetryTransport.request("telemetry:leaks", { email });
+}
+
+export function shouldUseBackendTelemetry() {
+  return import.meta.env.VITE_USE_MOCK_DATA !== "true";
+}
+
+export function getTelemetryWebSocketUrl() {
+  return import.meta.env.VITE_WS_URL || DEFAULT_WS_URL;
+}
+
+export function subscribeToBackendTelemetry(handlers: TelemetryStreamHandlers) {
+  if (typeof window === "undefined") return () => undefined;
+
+  const socket = new WebSocket(getTelemetryWebSocketUrl());
+
+  socket.addEventListener("open", () => handlers.onOpen?.());
+  socket.addEventListener("close", () => handlers.onClose?.());
+  socket.addEventListener("error", (error) => handlers.onError?.(error));
+  socket.addEventListener("message", (message) => {
+    try {
+      const parsed = JSON.parse(message.data as string) as BackendTelemetryEvent;
+      if (parsed.type === "outbound_connection" && parsed.ip) {
+        handlers.onEvent(parsed);
+      }
+    } catch (error) {
+      console.warn("Ignoring malformed telemetry event", error);
+    }
+  });
+
+  return () => {
+    socket.close();
+  };
 }

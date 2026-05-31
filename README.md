@@ -167,3 +167,11 @@ We follow conventional commits to make releases and history self-documenting:
    - Run a test build: `npm run build`
 4. Push your feature branch and create a **Pull Request (PR)** targeting the `develop` branch.
 5. Get at least one peer approval before merging.
+
+### 4. Run Backend + Frontend
+  1. Run backend
+  - 'cd <path of backend folder>'  'npm start'
+  2. Run frontend (path of Ghost-Mode)
+  - npm install
+  - npm run dev
+

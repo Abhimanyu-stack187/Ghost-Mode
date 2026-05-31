@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
 import { calculateExposureScore, type ExposureScoringInput, type ExposureScoringResult } from "../services/exposureScoring";
-import { getExposureData, getTrackerData, type TrackerData } from "../services/telemetry";
+import { getExposureData, getTrackerData, shouldUseBackendTelemetry, subscribeToBackendTelemetry, type BackendTelemetryEvent, type TrackerData } from "../services/telemetry";
 import type { RiskLevel, TelemetryEvent, TelemetryEventKind, TelemetrySnapshot } from "../types/telemetry";
 import { useNotifications } from "./NotificationContext";
 
@@ -19,6 +19,7 @@ interface TelemetrySimulationState {
   snapshot?: TelemetrySnapshot;
   trackers?: TrackerData;
   scoring?: ExposureScoringResult;
+  backendLive: boolean;
 }
 
 const templates: SimulatedEventTemplate[] = [
@@ -37,11 +38,28 @@ function createTelemetryEvent(template: SimulatedEventTemplate): TelemetryEvent 
   return { id: `sim-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }), kind: template.kind, title: template.title, detail: pick(template.details), risk: template.risk };
 }
 
+function createBackendEvent(event: BackendTelemetryEvent): TelemetryEvent {
+  const processName = event.process || "unknown process";
+  const destination = event.port ? `${event.ip}:${event.port}` : event.ip;
+  const risk = event.severity || event.risk || "medium";
+  const category = event.company && event.category ? `${event.company} ${event.category}` : "Network";
+  const score = event.riskScore ? ` / score ${event.riskScore}` : "";
+  return {
+    id: `backend-${event.timestamp}-${processName}-${destination}`,
+    timestamp: new Date(event.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }),
+    kind: "network",
+    title: `${risk.toUpperCase()} risk connection`,
+    detail: `${processName} / ${destination} / ${category}${event.protocol ? ` / ${event.protocol}` : ""}${score}`,
+    risk,
+  };
+}
+
 export function TelemetrySimulationProvider({ children }: PropsWithChildren) {
   const { pushNotification } = useNotifications();
   const [snapshot, setSnapshot] = useState<TelemetrySnapshot>();
   const [trackers, setTrackers] = useState<TrackerData>();
   const [scoring, setScoring] = useState<ExposureScoringResult>();
+  const [backendLive, setBackendLive] = useState(false);
   const scoringInput = useRef<ExposureScoringInput>();
 
   useEffect(() => {
@@ -59,7 +77,34 @@ export function TelemetrySimulationProvider({ children }: PropsWithChildren) {
   }, []);
 
   useEffect(() => {
-    if (!snapshot || !trackers) return;
+    if (!shouldUseBackendTelemetry() || !snapshot || !trackers) return;
+
+    return subscribeToBackendTelemetry({
+      onOpen: () => setBackendLive(true),
+      onClose: () => setBackendLive(false),
+      onError: () => setBackendLive(false),
+      onEvent: (backendEvent) => {
+        const event = createBackendEvent(backendEvent);
+        const currentInput = scoringInput.current;
+        if (!currentInput) return;
+
+        const input = {
+          ...currentInput,
+          connectionVolume: clamp(backendEvent.activeConnections ?? currentInput.connectionVolume + 1, 1, 128),
+          previousScore: scoringInput.current?.previousScore,
+        };
+        const result = calculateExposureScore(input);
+        scoringInput.current = { ...input, previousScore: result.score };
+        setScoring(result);
+        pushNotification(event);
+        setSnapshot((current) => current ? { ...current, score: result.score, risk: result.risk, trendPercent: Math.abs(result.trendDelta), eventCount: current.eventCount + 1, recentEvents: [event, ...current.recentEvents].slice(0, 5) } : current);
+        setTrackers((current) => current ? { ...current, eventCount: current.eventCount + 1, activeConnections: input.connectionVolume } : current);
+      },
+    });
+  }, [Boolean(snapshot), Boolean(trackers), pushNotification]);
+
+  useEffect(() => {
+    if (!snapshot || !trackers || backendLive) return;
     let timer = 0;
     const schedule = () => {
       timer = window.setTimeout(() => {
@@ -79,9 +124,9 @@ export function TelemetrySimulationProvider({ children }: PropsWithChildren) {
     };
     schedule();
     return () => window.clearTimeout(timer);
-  }, [Boolean(snapshot), Boolean(trackers), pushNotification, scoring?.score]);
+  }, [backendLive, Boolean(snapshot), Boolean(trackers), pushNotification, scoring?.score]);
 
-  const value = useMemo(() => ({ scoring, snapshot, trackers }), [scoring, snapshot, trackers]);
+  const value = useMemo(() => ({ backendLive, scoring, snapshot, trackers }), [backendLive, scoring, snapshot, trackers]);
   return <TelemetrySimulationContext.Provider value={value}>{children}</TelemetrySimulationContext.Provider>;
 }
 
