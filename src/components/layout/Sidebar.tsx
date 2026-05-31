@@ -12,7 +12,7 @@ const linkClassName = ({ isActive }: { isActive: boolean }) =>
 
 export function Sidebar() {
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 flex w-[216px] flex-col border-r border-white/[0.06] bg-[#070912]/90 px-4 py-5 backdrop-blur-2xl">
+    <aside className="fixed inset-y-0 left-0 z-30 hidden w-[216px] flex-col border-r border-white/[0.06] bg-[#070912]/90 px-4 py-5 backdrop-blur-2xl lg:flex">
       <div className="flex items-center gap-3 px-2">
         <div className="relative grid h-9 w-9 place-items-center rounded-xl border border-cyan/30 bg-cyan/10 text-cyan shadow-cyan">
           <Ghost size={18} strokeWidth={1.8} />
