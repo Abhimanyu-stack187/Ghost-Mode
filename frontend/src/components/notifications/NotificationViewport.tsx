@@ -3,11 +3,11 @@ import { Eye, KeyRound, RadioTower, ShieldAlert, X } from "lucide-react";
 import { useNotifications, type GhostNotification } from "../../contexts/NotificationContext";
 import type { RiskLevel, TelemetryEventKind } from "../../types/telemetry";
 
-const riskStyles: Record<RiskLevel, { border: string; glow: string; text: string }> = {
-  low: { border: "border-cyan/30", glow: "shadow-cyan", text: "text-cyan" },
-  medium: { border: "border-amber/30", glow: "shadow-amber", text: "text-amber" },
-  high: { border: "border-pink/35", glow: "shadow-pink", text: "text-pink" },
-  critical: { border: "border-danger/45", glow: "shadow-danger", text: "text-danger" },
+const riskStyles: Record<RiskLevel, { border: string; bg: string; text: string }> = {
+  low: { border: "border-cyan/15", bg: "bg-cyan/5", text: "text-cyan" },
+  medium: { border: "border-amber/15", bg: "bg-amber/5", text: "text-amber" },
+  high: { border: "border-pink/20", bg: "bg-pink/5", text: "text-pink" },
+  critical: { border: "border-danger/25", bg: "bg-danger/5", text: "text-danger" },
 };
 
 const icons: Record<TelemetryEventKind, typeof Eye> = {
@@ -21,11 +21,39 @@ function NotificationToast({ notification, dismiss }: { notification: GhostNotif
   const style = riskStyles[notification.risk];
   const Icon = icons[notification.kind];
   return (
-    <motion.article animate={{ opacity: 1, x: 0, scale: 1 }} className={`relative w-full overflow-hidden rounded-xl border bg-[#090d18]/95 p-4 backdrop-blur-2xl ${style.border} ${style.glow}`} exit={{ opacity: 0, x: 28, scale: 0.97 }} initial={{ opacity: 0, x: 42, scale: 0.96 }} layout transition={{ duration: 0.28 }}>
-      <motion.span animate={{ scaleX: 0 }} className="absolute inset-x-0 bottom-0 h-0.5 origin-left bg-current" initial={{ scaleX: 1 }} style={{ color: notification.risk === "critical" ? "#ff4d6d" : notification.risk === "high" ? "#ff4d9d" : notification.risk === "medium" ? "#ffb84d" : "#35e9ff" }} transition={{ duration: 5.2, ease: "linear" }} />
-      <div className="flex items-start gap-3">
-        <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-current bg-current/10 ${style.text}`}><Icon size={15} /></div>
-        <div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><p className="text-xs font-semibold text-white">{notification.title}</p><button aria-label="Dismiss notification" className="text-[#657089] transition hover:text-white" onClick={() => dismiss(notification.id)}><X size={13} /></button></div><p className="mt-1 text-[11px] leading-4 text-[#8792aa]">{notification.detail}</p><p className={`mt-2 font-mono text-[8px] uppercase tracking-[0.16em] ${style.text}`}>{notification.risk} risk / live telemetry</p></div>
+    <motion.article 
+      animate={{ opacity: 1, y: 0, scale: 1 }} 
+      className={`relative w-full overflow-hidden rounded-lg border bg-deep/60 p-3 backdrop-blur-md shadow-[0_8px_30px_rgba(0,0,0,0.5)] ${style.border}`} 
+      exit={{ opacity: 0, x: 20, scale: 0.95 }} 
+      initial={{ opacity: 0, y: 15, scale: 0.95 }} 
+      layout 
+      transition={{ duration: 0.25, ease: "easeOut" }}
+    >
+      <motion.span 
+        animate={{ scaleX: 0 }} 
+        className="absolute inset-x-0 bottom-0 h-[1.5px] origin-left bg-current opacity-70" 
+        initial={{ scaleX: 1 }} 
+        style={{ color: notification.risk === "critical" ? "#ff4d6d" : notification.risk === "high" ? "#ff4d9d" : notification.risk === "medium" ? "#ffb84d" : "#35e9ff" }} 
+        transition={{ duration: 4.5, ease: "linear" }} 
+      />
+      <div className="flex items-start gap-2.5">
+        <div className={`grid h-6.5 w-6.5 shrink-0 place-items-center rounded-md border border-current/20 bg-current/5 ${style.text}`}>
+          <Icon size={13} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-1.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="truncate text-xs font-semibold text-text-primary">{notification.title}</span>
+              <span className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wider border ${style.border} ${style.bg} ${style.text}`}>
+                {notification.risk}
+              </span>
+            </div>
+            <button aria-label="Dismiss notification" className="text-text-muted hover:text-text-primary transition-colors" onClick={() => dismiss(notification.id)}>
+              <X size={12} />
+            </button>
+          </div>
+          <p className="mt-1 text-[11px] leading-relaxed text-text-secondary">{notification.detail}</p>
+        </div>
       </div>
     </motion.article>
   );
@@ -33,5 +61,15 @@ function NotificationToast({ notification, dismiss }: { notification: GhostNotif
 
 export function NotificationViewport() {
   const { dismissNotification, notifications } = useNotifications();
-  return <aside aria-label="Live telemetry notifications" className="pointer-events-none fixed right-4 top-20 z-50 flex w-[min(360px,calc(100vw-2rem))] flex-col gap-3"><AnimatePresence initial={false}>{notifications.map((notification) => <div className="pointer-events-auto" key={notification.id}><NotificationToast dismiss={dismissNotification} notification={notification} /></div>)}</AnimatePresence></aside>;
+  return (
+    <aside aria-label="Live telemetry notifications" className="pointer-events-none fixed right-6 bottom-6 z-50 flex w-[min(340px,calc(100vw-3rem))] flex-col-reverse gap-2.5">
+      <AnimatePresence initial={false}>
+        {notifications.map((notification) => (
+          <div className="pointer-events-auto" key={notification.id}>
+            <NotificationToast dismiss={dismissNotification} notification={notification} />
+          </div>
+        ))}
+      </AnimatePresence>
+    </aside>
+  );
 }

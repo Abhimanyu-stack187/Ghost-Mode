@@ -17,13 +17,13 @@ interface NotificationContextValue {
 }
 
 const NotificationContext = createContext<NotificationContextValue | undefined>(undefined);
-const AUTO_DISMISS_MS = 5200;
+const AUTO_DISMISS_MS = 4500;
 
 export function NotificationProvider({ children }: PropsWithChildren) {
   const [notifications, setNotifications] = useState<GhostNotification[]>([]);
   const dismissNotification = useCallback((id: string) => setNotifications((current) => current.filter((notification) => notification.id !== id)), []);
   const pushNotification = useCallback((notification: Omit<GhostNotification, "createdAt">) => {
-    setNotifications((current) => [{ ...notification, createdAt: Date.now() }, ...current].slice(0, 4));
+    setNotifications((current) => [{ ...notification, createdAt: Date.now() }, ...current].slice(0, 3));
     window.setTimeout(() => dismissNotification(notification.id), AUTO_DISMISS_MS);
   }, [dismissNotification]);
   const value = useMemo(() => ({ dismissNotification, notifications, pushNotification }), [dismissNotification, notifications, pushNotification]);

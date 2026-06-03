@@ -4,18 +4,18 @@ import { Link } from "react-router-dom";
 import { GlassPanel } from "../../components/ui/GlassPanel";
 
 const nodes = [
-  { id: "you", label: "YOU", x: 50, y: 51, type: "user" },
-  { id: "chrome", label: "Chrome", x: 28, y: 42, type: "app" },
-  { id: "discord", label: "Discord", x: 73, y: 54, type: "app" },
-  { id: "google", label: "Google", x: 13, y: 24, type: "company" },
-  { id: "analytics", label: "Analytics", x: 20, y: 73, type: "tracker" },
-  { id: "sentry", label: "Sentry", x: 88, y: 28, type: "tracker" },
-  { id: "canva", label: "Canva", x: 83, y: 77, type: "company" },
+  { id: "google", label: "Google", x: 14, y: 28, type: "company" },
+  { id: "chrome", label: "Chrome", x: 30, y: 50, type: "app" },
+  { id: "you", label: "YOU", x: 50, y: 50, type: "user" },
+  { id: "discord", label: "Discord", x: 70, y: 50, type: "app" },
+  { id: "sentry", label: "Sentry", x: 86, y: 28, type: "tracker" },
+  { id: "analytics", label: "Analytics", x: 14, y: 72, type: "tracker" },
+  { id: "canva", label: "Canva", x: 86, y: 72, type: "company" },
 ];
 
 const edges = [
-  ["you", "chrome"], ["you", "discord"], ["chrome", "google"],
-  ["chrome", "analytics"], ["discord", "sentry"], ["discord", "canva"],
+  ["google", "chrome"], ["chrome", "you"], ["you", "discord"],
+  ["discord", "sentry"], ["chrome", "analytics"], ["discord", "canva"],
 ];
 
 const colors = { user: "#35e9ff", app: "#4586ff", company: "#9b5cff", tracker: "#ff4d9d" };
@@ -41,28 +41,58 @@ export function DigitalShadowPreview() {
           {edges.map(([sourceId, targetId], index) => {
             const source = getNode(sourceId);
             const target = getNode(targetId);
+            const isUserSource = source.type === "user";
+            const packetColor = isUserSource ? "#35e9ff" : "#ff4d9d"; // cyan or pink
+
             return (
               <g key={`${sourceId}-${targetId}`}>
-                <line stroke="rgba(133, 152, 255, 0.24)" strokeWidth="0.45" x1={source.x} x2={target.x} y1={source.y} y2={target.y} />
+                <line stroke="rgba(133, 152, 255, 0.16)" strokeWidth="0.4" x1={source.x} x2={target.x} y1={source.y} y2={target.y} />
                 <motion.circle
-                  animate={{ cx: [source.x, target.x], cy: [source.y, target.y] }}
-                  fill={index % 3 === 0 ? "#ff4d9d" : "#35e9ff"}
-                  initial={{ cx: source.x, cy: source.y }}
+                  animate={{ 
+                    cx: [source.x, target.x], 
+                    cy: [source.y, target.y],
+                    opacity: [0, 0.85, 0.85, 0] 
+                  }}
+                  fill={packetColor}
+                  initial={{ cx: source.x, cy: source.y, opacity: 0 }}
                   r="0.9"
-                  transition={{ delay: index * 0.32, duration: 2.2 + index * 0.2, ease: "linear", repeat: Infinity }}
+                  transition={{ 
+                    delay: index * 0.75, 
+                    duration: 4.8, 
+                    ease: "linear", 
+                    repeat: Infinity 
+                  }}
                 />
               </g>
             );
           })}
         </svg>
         {nodes.map((node, index) => (
-          <motion.div animate={{ opacity: 1, scale: 1 }} className="absolute -translate-x-1/2 -translate-y-1/2 text-center" initial={{ opacity: 0, scale: 0.4 }} key={node.id} style={{ left: `${node.x}%`, top: `${node.y}%` }} transition={{ delay: 0.08 * index, duration: 0.45 }}>
-            <div
-              className={`mx-auto rounded-full border ${node.type === "user" ? "h-11 w-11" : "h-6 w-6"}`}
-              style={{ backgroundColor: `${colors[node.type as keyof typeof colors]}22`, borderColor: colors[node.type as keyof typeof colors], boxShadow: `0 0 24px ${colors[node.type as keyof typeof colors]}66` }}
+          <div
+            className="absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center"
+            key={node.id}
+            style={{
+              height: node.type === "user" ? 40 : 20,
+              left: `${node.x}%`,
+              top: `${node.y}%`,
+              width: node.type === "user" ? 40 : 20,
+            }}
+          >
+            <motion.div
+              animate={{ opacity: 1, scale: 1 }}
+              className="h-full w-full rounded-full border"
+              initial={{ opacity: 0, scale: 0.4 }}
+              style={{ 
+                backgroundColor: `${colors[node.type as keyof typeof colors]}12`, 
+                borderColor: colors[node.type as keyof typeof colors], 
+                boxShadow: `0 0 12px ${colors[node.type as keyof typeof colors]}22` 
+              }}
+              transition={{ delay: 0.08 * index, duration: 0.45 }}
             />
-            <span className="mt-2 block whitespace-nowrap font-mono text-[9px] tracking-wide text-[#a4aec4]">{node.label}</span>
-          </motion.div>
+            <span className="absolute top-full mt-1.5 whitespace-nowrap font-mono text-[9px] tracking-wide text-[#a4aec4]">
+              {node.label}
+            </span>
+          </div>
         ))}
       </div>
 

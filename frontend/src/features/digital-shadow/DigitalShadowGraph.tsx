@@ -37,6 +37,40 @@ const activePath = new Set(["user->chrome", "chrome->google-analytics"]);
 const nodeId = (node: string | GraphNode) => typeof node === "string" ? node : node.id;
 const linkId = (link: GraphLink) => `${nodeId(link.source)}->${nodeId(link.target)}`;
 
+const getLinkDetails = (link: GraphLink, nodes: ShadowNode[]) => {
+  const sourceId = typeof link.source === "string" ? link.source : (link.source as GraphNode).id;
+  const targetId = typeof link.target === "string" ? link.target : (link.target as GraphNode).id;
+  const sourceNode = nodes.find(n => n.id === sourceId);
+  const targetNode = nodes.find(n => n.id === targetId);
+
+  if (!sourceNode || !targetNode) {
+    return { color: "#35e9ff", packetCount: 2, speed: 0.12, isHighRisk: false };
+  }
+
+  const isHighRisk = sourceNode.risk === "high" || targetNode.risk === "high";
+
+  // Color mapping:
+  // - User -> Application: cyan (#35e9ff)
+  // - Application -> Tracker: purple (#9b5cff)
+  // - High-risk tracker edge: pink/red (#ff4d9d)
+  let color = "#35e9ff";
+  if (sourceNode.kind === "user" && targetNode.kind === "application") {
+    color = "#35e9ff";
+  } else if (sourceNode.kind === "application" && targetNode.kind === "tracker-company") {
+    if (isHighRisk) {
+      color = "#ff4d9d"; // Pink
+    } else {
+      color = "#9b5cff"; // Purple
+    }
+  }
+
+  // Speed factor is in progress units per millisecond (approx)
+  const speed = isHighRisk ? 0.00028 : 0.00014;
+  const packetCount = isHighRisk ? 5 : 2;
+
+  return { color, packetCount, speed, isHighRisk };
+};
+
 export function DigitalShadowGraph({ nodes, links }: { nodes: ShadowNode[]; links: ShadowLink[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -66,37 +100,51 @@ export function DigitalShadowGraph({ nodes, links }: { nodes: ShadowNode[]; link
     const linkGroup = root.append("g");
     const packetGroup = root.append("g").attr("pointer-events", "none");
     const nodeGroup = root.append("g");
+    
     const linksSelection = linkGroup.selectAll<SVGLineElement, GraphLink>("line").data(graphLinks).join("line")
       .attr("class", (link) => `shadow-graph-link ${activePath.has(linkId(link)) ? "shadow-graph-link-active" : ""}`)
       .attr("marker-end", "url(#linkArrow)").attr("stroke-dasharray", "4 7").attr("stroke-opacity", 0)
-      .transition().duration(700).delay((_, index) => index * 70).attr("stroke-opacity", (link) => activePath.has(linkId(link)) ? 0.9 : 0.42)
+      .transition().duration(700).delay((_, index) => index * 70).attr("stroke-opacity", (link) => activePath.has(linkId(link)) ? 0.95 : 0.45)
       .selection();
 
-    const packets: DataPacket[] = graphLinks.flatMap((link, linkIndex) => {
-      const isActive = activePath.has(linkId(link));
-      const count = isActive ? 4 : 1;
-      return Array.from({ length: count }, (_, packetIndex) => ({
+    // Setup packets
+    interface CustomDataPacket extends DataPacket {
+      color: string;
+      speed: number;
+      offset: number;
+    }
+
+    const packets: CustomDataPacket[] = graphLinks.flatMap((link, linkIndex) => {
+      const details = getLinkDetails(link, nodes);
+      return Array.from({ length: details.packetCount }, (_, packetIndex) => ({
         id: `${linkIndex}-${packetIndex}`,
         link,
-        active: isActive,
-        offset: packetIndex / count + linkIndex * 0.11,
-        speed: isActive ? 0.00018 + packetIndex * 0.000012 : 0.00009,
+        active: true,
+        offset: packetIndex / details.packetCount,
+        speed: details.speed,
+        color: details.color,
       }));
     });
-    const packetSelection = packetGroup.selectAll<SVGCircleElement, DataPacket>("circle").data(packets).join("circle")
-      .attr("r", (packet) => packet.active ? 3.2 : 2).attr("fill", (packet) => packet.active ? "#35e9ff" : "#9b5cff")
-      .attr("filter", "url(#packetGlow)").attr("opacity", (packet) => packet.active ? 1 : 0.58);
+
+    const packetSelection = packetGroup.selectAll<SVGCircleElement, CustomDataPacket>("circle").data(packets).join("circle")
+      .attr("r", (packet) => packet.link && getLinkDetails(packet.link, nodes).isHighRisk ? 3.4 : 2.4)
+      .attr("fill", (packet) => packet.color)
+      .attr("filter", "url(#packetGlow)")
+      .attr("opacity-multiplier", "1")
+      .attr("opacity", 0);
 
     const nodeSelection = nodeGroup.selectAll<SVGGElement, GraphNode>("g").data(graphNodes).join("g")
       .attr("class", "cursor-grab active:cursor-grabbing").attr("opacity", 0);
+    
+    // Pulse effect
     nodeSelection.append("circle").attr("class", "shadow-node-pulse").attr("r", (node) => nodeRadius[node.kind] + 8)
-      .attr("fill", "transparent").attr("stroke", nodeColor).attr("stroke-opacity", 0.24).attr("stroke-width", 1);
+      .attr("fill", "transparent").attr("stroke", nodeColor).attr("stroke-opacity", 0.28).attr("stroke-width", 1.2);
     nodeSelection.append("circle").attr("class", "shadow-node-orbit").attr("r", (node) => nodeRadius[node.kind] + 7)
       .attr("fill", "transparent").attr("stroke", nodeColor).attr("stroke-opacity", 0.25).attr("stroke-dasharray", "2 5");
     nodeSelection.append("circle").attr("class", "shadow-node-core").attr("r", 0).attr("fill", (node) => `${nodeColor(node)}22`)
       .attr("stroke", nodeColor).attr("stroke-width", 1.5).attr("filter", "url(#nodeGlow)")
       .transition().duration(650).delay((_, index) => index * 65).attr("r", (node) => nodeRadius[node.kind]);
-    nodeSelection.append("circle").attr("r", 3).attr("fill", nodeColor);
+    nodeSelection.append("circle").attr("r", 3.5).attr("fill", nodeColor);
     nodeSelection.append("text").attr("y", (node) => nodeRadius[node.kind] + 20).attr("text-anchor", "middle")
       .attr("class", "fill-white font-mono text-[10px] font-bold tracking-wide").text((node) => node.label);
     nodeSelection.transition().duration(450).delay((_, index) => index * 65).attr("opacity", 1);
@@ -111,12 +159,22 @@ export function DigitalShadowGraph({ nodes, links }: { nodes: ShadowNode[]; link
       .force("y", d3.forceY<GraphNode>(height / 2).strength(0.1));
 
     const connectedTo = (link: GraphLink, id: string) => nodeId(link.source) === id || nodeId(link.target) === id;
+    
     const highlightConnections = (hovered?: GraphNode) => {
-      linksSelection.transition().duration(180).attr("stroke-opacity", (link) => !hovered ? (activePath.has(linkId(link)) ? 0.9 : 0.42) : connectedTo(link, hovered.id) ? 1 : 0.1)
-        .attr("stroke-width", (link) => hovered && connectedTo(link, hovered.id) ? 2.4 : activePath.has(linkId(link)) ? 1.8 : 1.2);
-      packetSelection.transition().duration(180).attr("opacity", (packet) => !hovered ? (packet.active ? 1 : 0.58) : connectedTo(packet.link, hovered.id) ? 1 : 0.08);
-      nodeSelection.transition().duration(180).attr("opacity", (node) => !hovered || node.id === hovered.id || graphLinks.some((link) => connectedTo(link, hovered.id) && connectedTo(link, node.id)) ? 1 : 0.22);
-      nodeSelection.select<SVGCircleElement>(".shadow-node-core").transition().duration(180).attr("r", (node) => nodeRadius[node.kind] + (hovered?.id === node.id ? 5 : 0));
+      // Non-connected paths get dimmed to 0.05
+      linksSelection.transition().duration(180)
+        .attr("stroke-opacity", (link) => !hovered ? (activePath.has(linkId(link)) ? 0.95 : 0.45) : connectedTo(link, hovered.id) ? 1.0 : 0.05)
+        .attr("stroke-width", (link) => hovered && connectedTo(link, hovered.id) ? 2.8 : activePath.has(linkId(link)) ? 2.0 : 1.2);
+      
+      // Update packet opacity-multiplier
+      packetSelection.attr("opacity-multiplier", (packet) => !hovered ? "1" : connectedTo(packet.link, hovered.id) ? "1" : "0.05");
+
+      // Dim non-connected nodes
+      nodeSelection.transition().duration(180)
+        .attr("opacity", (node) => !hovered || node.id === hovered.id || graphLinks.some((link) => connectedTo(link, hovered.id) && connectedTo(link, node.id)) ? 1 : 0.12);
+      
+      nodeSelection.select<SVGCircleElement>(".shadow-node-core").transition().duration(180)
+        .attr("r", (node) => nodeRadius[node.kind] + (hovered?.id === node.id ? 5 : 0));
     };
 
     const drag = d3.drag<SVGGElement, GraphNode>()
@@ -142,17 +200,26 @@ export function DigitalShadowGraph({ nodes, links }: { nodes: ShadowNode[]; link
     const startedAt = performance.now();
     let animationFrame = 0;
     const animatePackets = (time: number) => {
-      packetSelection.attr("cx", (packet) => {
-        const progress = ((time - startedAt) * packet.speed + packet.offset) % 1;
-        const source = packet.link.source as GraphNode;
-        const target = packet.link.target as GraphNode;
-        return (source.x ?? 0) + ((target.x ?? 0) - (source.x ?? 0)) * progress;
-      }).attr("cy", (packet) => {
-        const progress = ((time - startedAt) * packet.speed + packet.offset) % 1;
-        const source = packet.link.source as GraphNode;
-        const target = packet.link.target as GraphNode;
-        return (source.y ?? 0) + ((target.y ?? 0) - (source.y ?? 0)) * progress;
-      });
+      packetSelection
+        .attr("cx", (packet) => {
+          const progress = ((time - startedAt) * packet.speed + packet.offset) % 1;
+          const source = packet.link.source as GraphNode;
+          const target = packet.link.target as GraphNode;
+          return (source.x ?? 0) + ((target.x ?? 0) - (source.x ?? 0)) * progress;
+        })
+        .attr("cy", (packet) => {
+          const progress = ((time - startedAt) * packet.speed + packet.offset) % 1;
+          const source = packet.link.source as GraphNode;
+          const target = packet.link.target as GraphNode;
+          return (source.y ?? 0) + ((target.y ?? 0) - (source.y ?? 0)) * progress;
+        })
+        .attr("opacity", function(packet) {
+          const progress = ((time - startedAt) * packet.speed + packet.offset) % 1;
+          // Fade in at source, fade out at target using sin curve
+          const fadeOpacity = Math.sin(progress * Math.PI);
+          const multiplier = parseFloat(d3.select(this).attr("opacity-multiplier") || "1");
+          return fadeOpacity * multiplier;
+        });
       animationFrame = requestAnimationFrame(animatePackets);
     };
     animationFrame = requestAnimationFrame(animatePackets);
