@@ -1,0 +1,1 @@
+C:\Users\LENOVO\OneDrive\Desktop\Documents\Ghost\ Mode\backend\rust\risk-engine\target\x86_64-pc-windows-gnu\debug\risk-engine.exe: C:\Users\LENOVO\OneDrive\Desktop\Documents\Ghost\ Mode\backend\rust\risk-engine\src\main.rs
