@@ -19,21 +19,23 @@ cd ghostmode
 
 ### 3. Install Dependencies
 ```bash
+cd frontend
 npm install
 ```
 
 ### 4. Setup Environment Variables
 Copy the configuration template to create your local environment file:
 ```bash
-cp .env.example .env.local
+cp frontend/.env.example frontend/.env.local
 ```
-*(On Windows PowerShell, use: `copy .env.example .env.local`)*
+*(On Windows PowerShell, use: `copy frontend/.env.example frontend/.env.local`)*
 
 By default, `VITE_USE_MOCK_DATA` is set to `true`, which enables the built-in telemetry simulation.
 
 ### 5. Run the Project
 Start the local development server:
 ```bash
+cd frontend
 npm run dev
 ```
 Open **[http://localhost:5173](http://localhost:5173)** in your browser to view the application.
@@ -167,3 +169,12 @@ We follow conventional commits to make releases and history self-documenting:
    - Run a test build: `npm run build`
 4. Push your feature branch and create a **Pull Request (PR)** targeting the `develop` branch.
 5. Get at least one peer approval before merging.
+
+### 4. Run Backend + Frontend
+  1. Run backend
+  - 'cd backend'  'npm start'
+  2. Run frontend
+  - 'cd frontend'
+  - 'npm install'
+  - 'npm run dev'
+
